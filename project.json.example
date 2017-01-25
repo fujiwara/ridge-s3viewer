@@ -1,0 +1,11 @@
+{
+  "name": "ridge-s3viewer",
+  "description": "",
+  "language": "go",
+  "memory": 128,
+  "timeout": 5,
+  "role": "<YOUR_ROLE_ARN>",
+  "environment": {
+    "BUCKET_NAME": "<YOUR_BUCKET_NAME>"
+  }
+}
