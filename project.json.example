@@ -1,11 +1,13 @@
 {
   "name": "ridge-s3viewer",
   "description": "",
-  "language": "go",
+  "runtime": "golang",
   "memory": 128,
   "timeout": 5,
   "role": "<YOUR_ROLE_ARN>",
   "environment": {
-    "BUCKET_NAME": "<YOUR_BUCKET_NAME>"
+    "BUCKET_NAME": "<YOUR_BUCKET_NAME>",
+    "WEBSITE_HOSTING": "<true if your bucket enable website hosting>",
+    "HTTPS": "<true if your bucket enable website hosting with HTTPS>",
   }
 }

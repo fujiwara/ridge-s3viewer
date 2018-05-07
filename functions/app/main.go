@@ -5,8 +5,10 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -17,12 +19,16 @@ import (
 	"github.com/fujiwara/ridge"
 )
 
-var BucketName *string
+var (
+	BucketName     string
+	WebSiteHosting bool
+	HTTPS          bool
+)
 
 var html = `
 <!doctype html>
 <html charset="utf-8">
-  <head>
+  <head>{{ $base := .BaseURL }}
     <title>{{ $bucket := .res.Name }}{{ $bucket }}/{{ .Prefix }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
@@ -47,7 +53,7 @@ var html = `
     {{range .res.Contents}}
       {{if isDir .Key}}
       {{else}}
-      <a href="http://{{ $bucket }}.s3.amazonaws.com/{{ .Key }}" class="list-group-item">
+      <a href="{{$base}}/{{ .Key }}" class="list-group-item">
         <h4 class="list-group-item-heading">
           <span class="glyphicon glyphicon-file" aria-hidden="true"></span>
           {{ basename .Key }}
@@ -63,7 +69,9 @@ var html = `
 `
 
 func init() {
-	BucketName = aws.String(os.Getenv("BUCKET_NAME"))
+	BucketName = os.Getenv("BUCKET_NAME")
+	WebSiteHosting, _ = strconv.ParseBool(os.Getenv("WEBSITE_HOSTING"))
+	HTTPS, _ = strconv.ParseBool(os.Getenv("HTTPS"))
 }
 
 func main() {
@@ -96,19 +104,32 @@ func main() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		prefix := strings.TrimPrefix(r.URL.Path, "/")
 		params := &s3.ListObjectsInput{
-			Bucket:    BucketName,
+			Bucket:    aws.String(BucketName),
 			Delimiter: aws.String("/"),
 			Prefix:    aws.String(prefix),
 		}
 		resp, err := svc.ListObjects(params)
 		if err != nil {
-			log.Println(err)
+			log.Println("ListObjects failed", err)
 			http.Error(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		u := &url.URL{}
+		if HTTPS {
+			u.Scheme = "https"
+		} else {
+			u.Scheme = "http"
+		}
+		if WebSiteHosting {
+			u.Host = BucketName
+		} else {
+			u.Host = BucketName + ".s3.amazonaws.com"
+		}
+
 		tmpl.ExecuteTemplate(w, "html", map[string]interface{}{
-			"Prefix": prefix,
-			"res":    resp,
+			"Prefix":  prefix,
+			"res":     resp,
+			"BaseURL": u.String(),
 		})
 	})
 
